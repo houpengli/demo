@@ -16,6 +16,10 @@ public class ConcurrentTaskExecutorDemo {
     public static void main(String[] args) {
         Long start  = System.currentTimeMillis();
         ThreadPoolTaskExecutor exs = new ThreadPoolTaskExecutor();
+        exs.setQueueCapacity(10000);
+        exs.setCorePoolSize(10);
+        exs.setMaxPoolSize(20);
+        exs.setKeepAliveSeconds(5000);
         exs.initialize();
 
         CompletionService<Integer> completionService = new ExecutorCompletionService<Integer>(exs);

@@ -16,8 +16,8 @@ public class ThreadPoolTaskExecutorDemo {
         Long start  = System.currentTimeMillis();
         ThreadPoolTaskExecutor exs = new ThreadPoolTaskExecutor();
         exs.setQueueCapacity(10000);
-        exs.setCorePoolSize(5);
-        exs.setMaxPoolSize(10);
+        exs.setCorePoolSize(10);
+        exs.setMaxPoolSize(20);
         exs.setKeepAliveSeconds(5000);
         exs.initialize();
 
