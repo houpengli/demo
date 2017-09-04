@@ -1,0 +1,98 @@
+package com.zhangkai.reflect;
+
+import com.nxin.cache.MemCacheManager;
+import com.nxin.mfarm.common.annotation.Token;
+import com.nxin.mfarm.common.utils.Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.method.HandlerMethod;
+import org.springframework.web.servlet.handler.HandlerInterceptorAdapter;
+import org.springframework.web.util.WebUtils;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.lang.reflect.Method;
+import java.util.UUID;
+
+/**
+ * Created by lyf
+ * on 2015/11/30.
+ */
+public class DuplicateSubmitInterceptor extends HandlerInterceptorAdapter {
+
+    @Autowired
+    private MemCacheManager memCacheManager;
+    private String alertErrorPage;
+    private final static String TOKEN_STRING="token";
+    private final static Logger Logger= LoggerFactory.getLogger(DuplicateSubmitInterceptor.class);
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
+                             Object handler) throws Exception {
+        Cookie cookie= WebUtils.getCookie(request, Constants.MTLW_COOKIE_NAME_STRING);
+        if(null==cookie)
+            return false;
+
+        Logger.info(" get sessionId = "+request.getSession().getId());
+        if (handler instanceof HandlerMethod) {
+            HandlerMethod handlerMethod = (HandlerMethod) handler;
+            Method method = handlerMethod.getMethod();
+            Token annotation = method.getAnnotation(Token.class );
+            if (annotation != null ) {
+                boolean saveTokenSession = annotation.saveToken();
+                if (saveTokenSession) {
+                    String tokenValue= UUID.randomUUID().toString();
+                    Logger.info(" save tokenSession by cookie ,cookie value="+cookie.getValue()+"; tokenValue="+tokenValue);
+                    memCacheManager.set(TOKEN_STRING, cookie.getValue(), Constants.ONE_HOUR_CACHETIME,tokenValue);
+                    //页面显示通过Session赋值
+                    request.getSession( false ).setAttribute(TOKEN_STRING , tokenValue);
+                }
+                boolean needRemoveSession = annotation.removeToken();
+                if (needRemoveSession) {
+                    if (isDuplicateSubmit(request,cookie.getValue())) {
+                        response.sendRedirect(alertErrorPage); // 返回提示页面
+                        return false ;
+                    }
+                    memCacheManager.remove(TOKEN_STRING, cookie.getValue());
+                }
+            }
+            return true ;
+        } else {
+            return super.preHandle(request, response, handler);
+        }
+    }
+
+    /**
+     * 验证服务端的token是否与提交的一致
+     * @param request
+     * @return
+     */
+    private boolean isDuplicateSubmit(HttpServletRequest request,String cookieKey){
+        /*String sessionToken = (String) request.getSession(false).getAttribute(TOKEN_STRING);*/
+        String sessionToken =memCacheManager.get(TOKEN_STRING,cookieKey);
+        if (sessionToken == null) {
+            return true;
+        }
+        //用户提交的Token值
+        String postToken = request.getParameter(TOKEN_STRING);
+        if (postToken == null) {
+            Logger.warn("postToken is null");
+            return true;
+        }
+        if (!sessionToken.equals(postToken)) {
+            Logger.warn("sessionToken is not equals postToken,sessionToken is ="+sessionToken+";postToken="+postToken);
+            return true;
+        }
+        return false;
+    }
+
+    public String getAlertErrorPage() {
+        return alertErrorPage;
+    }
+
+    public void setAlertErrorPage(String alertErrorPage) {
+        this.alertErrorPage = alertErrorPage;
+    }
+}

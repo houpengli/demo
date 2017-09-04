@@ -17,7 +17,9 @@ repositories {
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
-    compile group: 'org.springframework', name: 'spring-context', version:"4.3.9.RELEASE"
+//    compile group: 'org.springframework', name: 'spring-context', version:"4.3.9.RELEASE"
+    compile group: 'org.springframework.boot', name: 'spring-boot', version:"1.5.4.RELEASE"
+
 }
 
 sourceSets*.allSource.srcDirs.flatten()*.mkdirs()
