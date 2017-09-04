@@ -1,4 +1,4 @@
-#1000万并发购买5000库存的商品
+# 1000万并发购买5000库存的商品
 #sql语句解决
 通过sql语句控制库存为负数update s_store set amount = amount - quantity where amount>=quantity and postID = 12345'
 缺点：数据库访问压力大导致的性能问题， 优点：不会出现数据错误问题，编程复杂度低
