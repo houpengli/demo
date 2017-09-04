@@ -176,7 +176,12 @@ System.out.println(Integer.parseInt("1111111", 2) & Integer.parseInt("0001111", 
 
    (4)、建立一 公共溢出区
 
-  而HashMap采用的是链地址法，这几种方法在以后的博客会有单独介绍，这里就不做介绍了。
+  而HashMap采用的是链地址法，Entry中引用Entry
+   static class Entry<K,V> implements Map.Entry<K,V> {
+          final K key;
+          V value;
+          Entry<K,V> next;
+          int hash;
 
 
 
