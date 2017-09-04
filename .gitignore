@@ -1,0 +1,11 @@
+*.iml
+.gradle
+.idea
+out
+*/build
+*/target
+/build/
+/.classpath
+/.project
+/.settings/
+/nxin-farm-web/src/main/resources/jobs.xml
