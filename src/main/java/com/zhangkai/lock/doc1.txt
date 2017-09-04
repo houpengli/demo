@@ -1,0 +1,335 @@
+第一步，使用zookeeper节点名称唯一性，用于分布式锁:
+
+      关于zookeeper集群的搭建，可以参考我之前写的一篇文章: ZooKeeper1 利用虚拟机搭建自己的ZooKeeper集群
+
+      zookeeper抽象出来的节点结构是一个和文件系统类似的小型的树状的目录结构，同时zookeeper机制规定：同一个目录下只能有一个唯一的文件名。例如：我们在zookeeper的根目录下，由两个客户端同时创建一个名为/myDistributeLock，只有一个客户端可以成功。
+
+      上述方案和memcached的add()方法、redis的setnx()方法实现分布式锁有着相同的思路。这样的方案实现起来如果不考虑搭建和维护zookeeper集群的成本，由于正确性和可靠性是zookeeper机制自己保证的，实现还是比较简单的。
+
+
+
+ 　  第二步，使用zookeeper临时顺序节点，用于分布式锁:
+
+
+
+      在讨论这套方案之前，我们有必要先“吹毛求疵”般的说明一下使用zookeeper节点名称唯一性来做分布式锁这个方案的缺点。比如，当许多线程在等待一个锁时，如果锁得到释放的时候，那么所有客户端都被唤醒，但是仅仅有一个客户端得到锁。在这个过程中，大量的线程根本没有获得锁的可能性，但是也会引起大量的上下文切换，这个系统开销也是不小的，对于这样的现象有一个专业名词，称之为“惊群效应”。
+
+     我们首先说明一下zookeeper的顺序节点、临时节点和watcher机制:
+
+     所谓顺序节点，假如我们在/myDisLocks/目录下创建3个节点，zookeeper集群会按照发起创建的顺序来创建节点，节点分别为/myDisLocks/0000000001、/myDisLocks/0000000002、/myDisLocks/0000000003。
+
+     所谓临时节点，临时节点由某个客户端创建，当客户端与zookeeper集群断开连接，则该节点自动被删除。
+
+     所谓对于watcher机制，大家可以参考Apache ZooKeeper Watcher机制源码解释。当然如果你之前不知道watcher机制是个什么东东，不建议你直接去看前边我提供的文章链接，这样你极有可能忘掉我们的讨论主线，即分布式锁的实现方案，而陷入到watcher机制的源码实现中。所以你也可以先看看下面的具体方案，猜测一下watcher是用来干嘛的，我这里先总结一句话做个引子: 所谓watcher机制，你可以简单一点儿理解成任何一个连接zookeeper的客户端可以通过watcher机制关注自己感兴趣的节点的增删改查，当这个节点发生增删改查的操作时，会“广播”自己的消息，所有对此感兴趣的节点可以在收到这些消息后，根据自己的业务需要执行后续的操作。
+
+     具体的使用步骤如下:
+
+      1. 每个业务线程调用create()方法创建名为“/myDisLocks/thread”的节点，需要注意的是，这里节点的创建类型需要设置为EPHEMERAL_SEQUENTIAL，即节点类型为临时顺序节点。此时/myDisLocks节点下会出现诸如/myDisLocks/thread0000000001、/myDisLocks/thread0000000002、/myDisLocks/thread0000000003这样的子节点。
+
+     2. 每个业务线程调用getChildren(“myDisLocks”)方法来获取/myDisLocks这个节点下所有已经创建的子节点。
+
+      3. 每个业务线程获取到所有子节点的路径之后，如果发现自己在步骤1中创建的节点的尾缀编号是所有节点中序号最小的，那么就认为自己获得了锁。
+
+      4. 如果在步骤3中发现自己并非是所有子节点中序号最小的，说明自己还没有获取到锁。使用watcher机制监视比自己创建节点的序列号小的节点（比自己创建的节点小的最大节点），进入等待。比如，如果当前业务线程创建的节点是/myDisLocks/thread0000000003，那么在没有获取到锁的情况下，他只需要监视/myDisLocks/thread0000000002的情况。只有当/myDisLocks/thread0000000002获取到锁并释放之后，当前业务线程才启动获取锁，这样可以避免一个业务线程释放锁之后，其他所有线程都去竞争锁，引起不必要的上下文切换，最终造成“惊群现象”。
+
+     5. 释放锁的过程相对比较简单，就是删除自己创建的那个子节点即可。
+
+      注意: 这个方案实现的分布式锁还带着一点儿公平锁的味道！为什么呢？我们在利用每个节点的序号进行排队以此来避免进群现象时，实际上所有业务线程获得锁的顺序就是自己创建节点的顺序，也就是哪个业务线程先来，哪个就可以最快获得锁。
+
+      下面贴出我自己实现的上述方案的代码:
+
+      1. 代码中有两个Java类: MyDistributedLockByZK.java和LockWatcher.java。其中MyDistributedLockByZK.java中的main函数利用线程池启动5个线程，以此来模拟多个业务线程竞争锁的情况；而LockWatcher.java定义分布式锁和实现了watcher机制。
+
+      2. 同时，我使用的zookeeper集群是自己以前利用VMWare搭建的集群，所以zookeeper链接是192.168.224.170:2181，大家可以根据替换成自己的zookeeper链接即可。
+
+复制代码
+ 1 public class MyDistributedLockByZK {
+ 2     /** 线程池 **/
+ 3     private static ExecutorService executorService = null;
+ 4     private static final int THREAD_NUM = 5;
+ 5     private static int threadNo = 0;
+ 6     private static CountDownLatch threadCompleteLatch = new CountDownLatch(THREAD_NUM);
+ 7
+ 8     /** ZK的相关配置常量 **/
+ 9     private static final String CONNECTION_STRING = "192.168.224.170:2181";
+10     private static final int SESSION_TIMEOUT = 10000;
+11     // 此变量在LockWatcher中也有一个同名的静态变量，正式使用的时候，提取到常量类中共同维护即可。
+12     private static final String LOCK_ROOT_PATH = "/myDisLocks";
+13
+14     public static void main(String[] args) {
+15         // 定义线程池
+16         executorService = Executors.newFixedThreadPool(THREAD_NUM, new ThreadFactory() {
+17             @Override
+18             public Thread newThread(Runnable r) {
+19                 String name = String.format("第[%s]个测试线程", ++threadNo);
+20                 Thread ret = new Thread(Thread.currentThread().getThreadGroup(), r, name, 0);
+21                 ret.setDaemon(false);
+22                 return ret;
+23             }
+24         });
+25
+26         // 启动线程
+27         if (executorService != null) {
+28             startProcess();
+29         }
+30     }
+31
+32     /**
+33      * @author zhangyi03
+34      * @date 2017-5-23 下午5:57:27
+35      * @description 模拟并发执行任务
+36      */
+37      public static void startProcess() {
+38         Runnable disposeBusinessRunnable= new Thread(new Runnable() {
+39             public void run() {
+40                 String threadName = Thread.currentThread().getName();
+41
+42                 LockWatcher lock = new LockWatcher(threadCompleteLatch);
+43                 try {
+44                     /** 步骤1: 当前线程创建ZK连接  **/
+45                     lock.createConnection(CONNECTION_STRING, SESSION_TIMEOUT);
+46
+47                     /** 步骤2: 创建锁的根节点  **/
+48                     // 注意，此处创建根节点的方式其实完全可以在初始化的时候由主线程单独进行根节点的创建，没有必要在业务线程中创建。
+49                     // 这里这样写只是一种思路而已，不必局限于此
+50                     synchronized (MyDistributedLockByZK.class){
+51                         lock.createPersistentPath(LOCK_ROOT_PATH, "该节点由" + threadName + "创建", true);
+52                     }
+53
+54                     /** 步骤3: 开启锁竞争并执行任务 **/
+55                     lock.getLock();
+56                 } catch (Exception e) {
+57                     e.printStackTrace();
+58                 }
+59             }
+60         });
+61
+62         for (int i = 0; i < THREAD_NUM; i++) {
+63             executorService.execute(disposeBusinessRunnable);
+64         }
+65         executorService.shutdown();
+66
+67         try {
+68             threadCompleteLatch.await();
+69             System.out.println("所有线程运行结束!");
+70         } catch (InterruptedException e) {
+71             e.printStackTrace();
+72         }
+73      }
+74 }
+复制代码
+复制代码
+  1 public class LockWatcher implements Watcher {
+  2     /** 成员变量 **/
+  3     private ZooKeeper zk = null;
+  4     // 当前业务线程竞争锁的时候创建的节点路径
+  5     private String selfPath = null;
+  6     // 当前业务线程竞争锁的时候创建节点的前置节点路径
+  7     private String waitPath = null;
+  8     // 确保连接zk成功；只有当收到Watcher的监听事件之后，才执行后续的操作，否则请求阻塞在createConnection()创建ZK连接的方法中
+  9     private CountDownLatch connectSuccessLatch = new CountDownLatch(1);
+ 10     // 标识线程是否执行完任务
+ 11     private CountDownLatch threadCompleteLatch = null;
+ 12
+ 13     /** ZK的相关配置常量 **/
+ 14     private static final String LOCK_ROOT_PATH = "/myDisLocks";
+ 15     private static final String LOCK_SUB_PATH = LOCK_ROOT_PATH + "/thread";
+ 16
+ 17     public LockWatcher(CountDownLatch latch) {
+ 18         this.threadCompleteLatch = latch;
+ 19     }
+ 20
+ 21     @Override
+ 22     public void process(WatchedEvent event) {
+ 23         if (event == null) {
+ 24             return;
+ 25         }
+ 26
+ 27         // 通知状态
+ 28         Event.KeeperState keeperState = event.getState();
+ 29         // 事件类型
+ 30         Event.EventType eventType = event.getType();
+ 31
+ 32         // 根据通知状态分别处理
+ 33         if (Event.KeeperState.SyncConnected == keeperState) {
+ 34             if ( Event.EventType.None == eventType ) {
+ 35                 System.out.println(Thread.currentThread().getName() + "成功连接上ZK服务器");
+ 36                 // 此处代码的主要作用是用来辅助判断当前线程确实已经连接上ZK
+ 37                 connectSuccessLatch.countDown();
+ 38             }else if (event.getType() == Event.EventType.NodeDeleted && event.getPath().equals(waitPath)) {
+ 39                 System.out.println(Thread.currentThread().getName() + "收到情报，排我前面的家伙已挂，我准备再次确认我是不是最小的节点！？");
+ 40                 try {
+ 41                     if(checkMinPath()){
+ 42                         getLockSuccess();
+ 43                     }
+ 44                 } catch (Exception e) {
+ 45                     e.printStackTrace();
+ 46                 }
+ 47             }
+ 48         } else if ( Event.KeeperState.Disconnected == keeperState ) {
+ 49             System.out.println(Thread.currentThread().getName() + "与ZK服务器断开连接");
+ 50         } else if ( Event.KeeperState.AuthFailed == keeperState ) {
+ 51             System.out.println(Thread.currentThread().getName() + "权限检查失败");
+ 52         } else if ( Event.KeeperState.Expired == keeperState ) {
+ 53             System.out.println(Thread.currentThread().getName() + "会话失效");
+ 54         }
+ 55     }
+ 56
+ 57      /**
+ 58      * @author zhangyi03
+ 59      * @date 2017-5-23 下午6:07:03
+ 60      * @description 创建ZK连接
+ 61      * @param connectString ZK服务器地址列表
+ 62      * @param sessionTimeout Session超时时间
+ 63      * @throws IOException
+ 64      * @throws InterruptedException
+ 65      */
+ 66     public void createConnection(String connectString, int sessionTimeout) throws IOException, InterruptedException {
+ 67         zk = new ZooKeeper(connectString, sessionTimeout, this);
+ 68         // connectSuccessLatch.await(1, TimeUnit.SECONDS) 正式实现的时候可以考虑此处是否采用超时阻塞
+ 69         connectSuccessLatch.await();
+ 70     }
+ 71
+ 72     /**
+ 73      * @author zhangyi03
+ 74      * @date 2017-5-23 下午6:15:48
+ 75      * @description 创建ZK节点
+ 76      * @param path 节点path
+ 77      * @param data 初始数据内容
+ 78      * @param needWatch
+ 79      * @return
+ 80      * @throws KeeperException
+ 81      * @throws InterruptedException
+ 82      */
+ 83     public boolean createPersistentPath(String path, String data, boolean needWatch) throws KeeperException, InterruptedException {
+ 84         if(zk.exists(path, needWatch) == null){
+ 85             String result = zk.create( path,data.getBytes(),ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+ 86             System.out.println(Thread.currentThread().getName() + "创建节点成功, path: " + result + ", content: " + data);
+ 87         }
+ 88         return true;
+ 89     }
+ 90
+ 91     /**
+ 92      * @author zhangyi03
+ 93      * @date 2017-5-23 下午6:24:46
+ 94      * @description 获取分布式锁
+ 95      * @throws KeeperException
+ 96      * @throws InterruptedException
+ 97      */
+ 98      public void getLock() throws Exception {
+ 99         selfPath = zk.create(LOCK_SUB_PATH, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+100         System.out.println(Thread.currentThread().getName() + "创建锁路径:" + selfPath);
+101         if(checkMinPath()){
+102             getLockSuccess();
+103         }
+104      }
+105
+106      /**
+107      * @author zhangyi03
+108      * @date 2017-5-23 下午7:02:41
+109      * @description 获取锁成功
+110      * @throws KeeperException
+111      * @throws InterruptedException
+112      */
+113     private void getLockSuccess() throws KeeperException, InterruptedException {
+114          if(zk.exists(selfPath, false) == null){
+115              System.err.println(Thread.currentThread().getName() + "本节点已不在了...");
+116              return;
+117          }
+118          System.out.println(Thread.currentThread().getName() + "获取锁成功，开始处理业务数据！");
+119          Thread.sleep(2000);
+120          System.out.println(Thread.currentThread().getName() + "处理业务数据完成，删除本节点：" + selfPath);
+121          zk.delete(selfPath, -1);
+122          releaseConnection();
+123          threadCompleteLatch.countDown();
+124      }
+125
+126      /**
+127      * @author zhangyi03
+128      * @date 2017-5-23 下午7:06:46
+129      * @description 关闭ZK连接
+130      */
+131     private void releaseConnection() {
+132         if (zk != null) {
+133             try {
+134                 zk.close();
+135             } catch (InterruptedException e) {
+136                 e.printStackTrace();
+137             }
+138         }
+139         System.out.println(Thread.currentThread().getName() + "释放ZK连接");
+140      }
+141
+142      /**
+143      * @author zhangyi03
+144      * @date 2017-5-23 下午6:57:14
+145      * @description 检查自己是不是最小的节点
+146      * @param selfPath
+147      * @return
+148      * @throws KeeperException
+149      * @throws InterruptedException
+150      */
+151     private boolean checkMinPath() throws Exception {
+152           List<String> subNodes = zk.getChildren(LOCK_ROOT_PATH, false);
+153           // 根据元素按字典序升序排序
+154           Collections.sort(subNodes);
+155           System.err.println(Thread.currentThread().getName() + "创建的临时节点名称:" + selfPath.substring(LOCK_ROOT_PATH.length()+1));
+156           int index = subNodes.indexOf(selfPath.substring(LOCK_ROOT_PATH.length()+1));
+157           System.err.println(Thread.currentThread().getName() + "创建的临时节点的index:" + index);
+158           switch (index){
+159               case -1: {
+160                   System.err.println(Thread.currentThread().getName() + "创建的节点已不在了..." + selfPath);
+161                   return false;
+162               }
+163               case 0:{
+164                   System.out.println(Thread.currentThread().getName() +  "子节点中，我果然是老大" + selfPath);
+165                   return true;
+166               }
+167               default:{
+168                   // 获取比当前节点小的前置节点,此处只关注前置节点是否还在存在，避免惊群现象产生
+169                   waitPath = LOCK_ROOT_PATH +"/"+ subNodes.get(index - 1);
+170                   System.out.println(Thread.currentThread().getName() + "获取子节点中，排在我前面的节点是:" + waitPath);
+171                   try {
+172                       zk.getData(waitPath, true, new Stat());
+173                       return false;
+174                   } catch (Exception e) {
+175                       if (zk.exists(waitPath, false) == null) {
+176                           System.out.println(Thread.currentThread().getName() + "子节点中，排在我前面的" + waitPath + "已失踪，该我了");
+177                           return checkMinPath();
+178                       } else {
+179                           throw e;
+180                       }
+181                   }
+182               }
+183
+184           }
+185      }
+186 }
+复制代码
+
+
+       第三步，使用memcached的cas()方法，用于分布式锁:
+
+       下篇文章我们再细说！
+
+
+
+       第四步，使用redis的watch、multi、exec命令，用于分布式锁:
+
+       下篇文章我们再细说！
+
+
+
+       第五步，总结:
+
+      综上，对于分布式锁这些非常用或者实现起来比较重的方案，大家可以根据自己在项目中的需要，酌情使用。最近在和别人讨论的过程中，以及我的第一篇关于分布式锁的文章分布式锁1 Java常用技术方案  大家的回复中，总结来看，对于用redis实现分布式锁确实存在着比较多的细节问题可以进行深入讨论，欢迎大家留言，相互学习。
+
+      忍不住嘚瑟一下，我媳妇儿此刻在我旁边看AbstractQueuedSynchronizer，厉害吧？！，一会儿出去吃饭，哈哈~
+
+
+
+      第六步，线上使用补充篇:
+
+       截止到2017.08.25(周五)，使用上述文章中的”临时节点+watcher机制方案”解决一个分布式锁的问题时，最终发现在实现过程中，由于watcher机制类似于通知等待机制的特点，如果主线程在经历“获取锁操作”、“处理业务代码”、“释放锁操作”这三步的过程中，使用watcher机制阻塞的获取锁时，会导致根本无法将获取锁结果返回给主线程，而在实际的时候过程中，一般情况下主线程在“获取锁操作”时都希望可以同步获得一个返回值。
+
+      所以，上述的”临时节点+watcher机制方案”从技术方案角度足够完美，但是在实际使用过程中，个人觉得还不是特别的方便。
