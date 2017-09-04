@@ -1,0 +1,19 @@
+LinkedList数据结构
+   引用第一个和最后一个的地址
+    /**
+     * Pointer to first node.
+     * Invariant: (first == null && last == null) ||
+     *            (first.prev == null && first.item != null)
+     */
+    transient Node<E> first;
+
+    /**
+     * Pointer to last node.
+     * Invariant: (first == null && last == null) ||
+     *            (last.next == null && last.item != null)
+     */
+    transient Node<E> last;
+    Node中引用上一个和下一个
+    E item;
+    Node<E> next;
+    Node<E> prev;

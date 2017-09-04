@@ -9,5 +9,6 @@ public class HashMapTest {
     public static void main(String[] args) {
         HashMap map = new HashMap();
         map.put("",1);
+        System.out.println(1 << 4);
     }
 }
