@@ -1,0 +1,81 @@
+RabbitMQ与Spring集成配置
+转至元数据结尾
+Created by Unknown User (nx0824), last modified on 三月 07, 2017 转至元数据起始
+
+1.引入相关jar包
+//RabbitMQ
+compile group: 'com.rabbitmq', name: 'amqp-client', version:"3.6.5"
+compile group: 'org.springframework.amqp', name: 'spring-rabbit', version: '1.6.6.RELEASE'
+compile group: 'org.springframework.integration', name: 'spring-integration-amqp', version: '4.3.5.RELEASE'
+生产者配置
+2.实现一个消息处理器,继承自org.springframework.amqp.core.MessageListener
+public class AmqpMsgListener implements MessageListener {
+
+  @Override
+ public void onMessage(Message message)
+    {
+        System.out.println(message.toString());
+ }
+}
+3.rabbit-producer.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xmlns:p="http://www.springframework.org/schema/p" xmlns:int="http://www.springframework.org/schema/integration"
+ xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+ xmlns:int-amqp="http://www.springframework.org/schema/integration/amqp"
+ xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit.xsd http://www.springframework.org/schema/integration/amqp http://www.springframework.org/schema/integration/amqp/spring-integration-amqp.xsd">
+ <!--连接工厂-->
+ <rabbit:connection-factory id="connectionFactory" host="10.209.11.200" port="5672" username="admin" password="dbn002385" publisher-confirms="true"/>
+ <!--创建队列-->
+ <rabbit:queue name="nx.farm.queue.test" durable="true" exclusive="false" auto-delete="false" />
+ <!--创建分发交换器-->
+ <rabbit:direct-exchange name="nx.farm.exchange.directTest" durable="true">
+ <rabbit:bindings>
+ <rabbit:binding key="foo.bar" queue="nx.farm.queue.test"></rabbit:binding>
+ </rabbit:bindings>
+ </rabbit:direct-exchange>
+
+ <rabbit:template id="amqpTemplate" connection-factory="connectionFactory" exchange="nx.farm.exchange.directTest" routing-key="foo.bar" message-converter="jsonMessageConverter" confirm-callback=""/>
+ <rabbit:admin connection-factory="connectionFactory" id="adminId"/>
+ <!-- 配置exchange,不同的exchange会影响消息分发策略 -->
+ <!-- 消息对象json转换类 -->
+ <bean id="jsonMessageConverter" class="org.springframework.amqp.support.converter.Jackson2JsonMessageConverter" />
+
+</beans>
+消费者配置
+4.rabbit-customer.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xmlns:rabbit="http://www.springframework.org/schema/rabbit"
+ xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/rabbit http://www.springframework.org/schema/rabbit/spring-rabbit.xsd">
+ <!-- rabbitmq连接配置 -->
+ <rabbit:connection-factory id="connectionFactory1" host="10.209.11.200" port="5672" username="admin" password="dbn002385" publisher-confirms="true"/>
+ <rabbit:admin connection-factory="connectionFactory1"/>
+ <!--按项目需求配置,推荐队列的名字为nx.{project-name}.queue -->
+ <rabbit:listener-container connection-factory="connectionFactory1" acknowledge="auto">
+ <rabbit:listener ref="amqpMsgListener" queues="nx.farm.queue.test" />
+ </rabbit:listener-container>
+ <bean id="amqpMsgListener" class="com.nxin.farm.test.AmqpMsgListener"/>
+</beans>
+5.创建测试类
+public class MqTest extends BaseJunit {
+  @Autowired
+ private RabbitTemplate amqpTemplate;
+
+ @Test
+ public void testSend()
+    {
+        try {
+            for(int i=0;i<100;i++){
+                amqpTemplate.convertAndSend("nx.farm.exchange.directTest", "foo.bar", "Hello, world! send by hezhe");
+ }
+            Thread.sleep(1000*1000);
+ } catch (AmqpException e) {
+            e.printStackTrace();
+ } catch (InterruptedException e) {
+            e.printStackTrace();
+ }
+    }
+}

@@ -1,0 +1,41 @@
+
+转至元数据结尾
+Created by Unknown User (nx0824), last modified on 三月 07, 2017 转至元数据起始
+
+RabbitMQ是流行的开源消息队列系统，用erlang语言开发。RabbitMQ是AMQP（高级消息队列协议）的标准实现。
+RabbitMQ中间件分为服务端（RabbitMQ Server）和客户端（RabbitMQ Client），服务端可以理解为是一个消息的代理消费者，客户端又分为消息生产者（Producer）和消息消费者（Consumer）。
+　　1、消息生产者（Producer）：主要生产消息并将消息基于TCP协议，通过建立Connection和Channel，将消息传输给RabbitMQ Server，对于Producer而言基本就完成了工作。
+　　2、服务端（RabbitMQ Server）：主要负责处理消息路由、分发、入队列、缓存和出列。主要由三部分组成：Exchange、RoutingKey、Queue。
+　　  （1）Exchange：用于接收消息生产者发送的消息，有三种类型的exchange：direct, fanout,topic，不同类型实现了不同的路由算法；
+　　　　A. direct exchange：将与routing key 比配的消息，直接推入相对应的队列，创建队列时，默认就创建同名的routing key。
+　　　　B. fanout exchange：是一种广播模式，忽略routingkey的规则。
+　　　　C. topic exchange：应用主题，根据key进行模式匹配路由，例如：若为abc*则推入到所有abc*相对应的queue；若为abc.#则推入到abc.xx.one ,abc.yy.two对应的queue。
+　　  （2）RoutingKey：是RabbitMQ实现路由分发到各个队列的规则，并结合Binging提供于Exchange使用将消息推送入队列；
+　　  （3）Queue：是消息队列，可以根据需要定义多个队列，设置队列的属性，比如：消息移除、消息缓存、回调机制等设置，实现与Consumer通信；
+　　3、消息消费者（Consumer）：主要负责消费Queue的消息，同样基于TCP协议，通过建立Connection和Channel与Queue传输消息，一个消息可以给多个Consumer消费；
+　　4、关键名词说明：
+Publisher：
+          是Message的生产者，Publisher这个Clients产生了一些Message。
+Consumer：
+          Message的消费者，Publisher产生的Message，最终要到达Consumer这个Clients，进行消费。
+Exchange：
+         指定消息按什么规则，路由到哪个Queue，Message消息先要到达Exchange，在Server中承担着从Produce接收Message的责任。
+Queue：
+         到达Exchange的消息，根据制定的规则（Routing key）到达对应的Queue，在Server中承担着装载Message，是Message的容器，等待被消费出去。
+Routing key：
+         在Exchange和Queue之间隐藏有一条黑线，可以将这条黑线看成是Routing key，Exchange就是根据这些定义好的Routing key将Message送到对应的Queue中去，是Exchange和Queue之间的桥梁。
+Broker：
+        之前一直不理解这个Broker，其实Broker就是接收和分发消息的应用，也就是说RabbitMQ Server就是Message Broker。
+VirtualHost：
+        虚拟主机，一个Broker里可以开有多个VirtualHost，它的作用是用作不同用户的权限分离。
+Connection：
+       是Publisher／Consumer和Broker之间的TCP连接。断开连接的操作只会在Publisher/Consumer端进行，Broker不会断开连接，除非出现网络故障或者Broker服务出现问题，Broker服务宕了。
+Connection: Channel:
+        如果每一次访问RabbitMQ就建立一个Connection，那在消息量大的时候建立TCP Connection的开销就会很大，导致的后果就是效率低下。
+Client发送消息，流程：
+       第一：获取Conection
+       第二：获取Channel
+       第三：定义Exchange，Queue
+       第四：使用一个RoutingKey将Queue Binding到一个Exchange上
+       第五：通过指定一个Exchange和一个RoutingKey来将消息发送到对应的Queue上，
+       第六：Consumer在接收时也是获取connection，接着获取channel，然后指定一个Queue，到Queue上取消息，它对Exchange，RoutingKey及如何Binding都不关心，到对应的Queue上去取消息就行了。
