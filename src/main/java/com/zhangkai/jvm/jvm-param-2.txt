@@ -1,0 +1,72 @@
+1.基本概念。
+JAVA_MEM_OPTS=" -server -Xmx2g -Xms2g -Xmn512m -XX:PermSize=128m -Xss256k -XX:+DisableExplicitGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled -XX:+UseCMSCompactAtFullCollection -XX:+UseFastAccessorMethods -XX:+UseCMSInitiatingOccupancyOnly -XX:+UseCompressedOops
+
+-server 启用能够执行优化的编译器。
+
+-Xss 单个线程堆栈大小值。
+
+-Xms 启动应用时，JVM堆空间的初始大小值。
+
+-Xmx 应用运行中，JVM堆空间的极限值。
+
+-Xmn 堆空间的新生代空间大小。
+
+-XX:PermSize永久存储区的大小
+
+2.VM性能诊断工具
+
+基本工具：JPS ，JSTAT，JMAP
+
+Jstat（ “Java Virtual Machine statistics monitoring tool” ）是JDK自带的一个轻量级小工具。主要对Java应用程序的资源和性能进行实时的命令行的监控，包括了对Heap size和垃圾回收状况的监控。
+语法结构如下：jstat [Options] vmid [interval] [count]
+    Options -- 选项，我们一般使用 -gcutil 查看gc情况
+    vmid    -- VM的进程号，即当前运行的java进程号
+    interval-- 间隔时间，单位为毫秒
+    count   -- 打印次数，如果缺省则打印无数次
+
+root@(none):~# jstat -gcutil 595
+  S0     S1     E      O      P     YGC     YGCT    FGC    FGCT  GCT
+  0.00   0.00  25.40  29.78  48.50      5    0.036     3    0.238    0.274
+
+    S0  -- Heap上的 Survivor space 0 区已使用空间的百分比
+    S1  -- Heap上的 Survivor space 1 区已使用空间的百分比
+    E   -- Heap上的 Eden space 区已使用空间的百分比
+    O   -- Heap上的 Old space 区已使用空间的百分比
+    P   -- Perm space 区已使用空间的百分比
+    YGC -- 从应用程序启动到采样时发生 Young GC 的次数
+    YGCT-- 从应用程序启动到采样时 Young GC 所用的时间(单位秒)
+    FGC -- 从应用程序启动到采样时发生 Full GC 的次数
+    FGCT-- 从应用程序启动到采样时 Full GC 所用的时间(单位秒)
+    GCT -- 从应用程序启动到采样时用于垃圾回收的总时间(单位秒)
+
+
+jstat -gccapacity查看内存占用情况
+[admin@server12 ~]$ jstat -gccapacity 10010
+
+NGCMN    NGCMX     NGC     S0C   S1C       EC      OGCMN      OGCMX       OGC         OC      PGCMN    PGCMX     PGC       PC     YGC    FGC
+65536.0 524288.0  65536.0 6528.0 6528.0  52480.0   196608.0  1572864.0   450572.0   450572.0  21248.0 131072.0  72900.0  72900.0  93842 16790
+
+NGCMN	Minimum new generation capacity (KB).
+NGCMX Maximum new generation capacity (KB).
+NGC Current new generation capacity (KB).
+S0C	Current survivor space 0 capacity (KB).
+S1C Current survivor space 1 capacity (KB).
+EC Current eden space capacity (KB).
+OGCMN	Minimum old generation capacity (KB).
+OGCMX Maximum old generation capacity (KB).
+OGC Current old generation capacity (KB).
+OC Current old space capacity (KB).
+PGCMN	Minimum permanent generation capacity (KB).
+PGCMX Maximum Permanent generation capacity (KB).
+PGC Current Permanent generation capacity (KB).
+PC Current Permanent space capacity (KB).
+YGC	Number of Young generation GC Events.
+FGC Number of Full GC Events.
+
+jmap
+jmap 是一个可以输出所有内存中对象的工具，甚至可以将VM 中的heap，以二进制输出成文本。
+使用方法
+jmap -histo pid>a.log可以将其保存到文本中去，在一段时间后，使用文本对比工具，可以对比出GC回收了哪些对象。
+jmap -dump:format=b,file=f1 PID可以将该PID进程的内存heap输出出来到f1文件里。
+
+集成工具: JConsole，jvisualvm

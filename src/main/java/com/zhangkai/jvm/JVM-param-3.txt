@@ -1,0 +1,60 @@
+在一些规模稍大的应用中，Java虚拟机（JVM）的内存设置尤为重要，想在项目中取得好的效率，GC（垃圾回收）的设置是第一步。
+PermGen space：全称是Permanent Generation space.就是说是永久保存的区域,用于存放Class和Meta信息,Class在被Load的时候被放入该区域Heap space：存放Instance。
+GC(Garbage Collection)应该不会对PermGen space进行清理,所以如果你的APP会LOAD很多CLASS的话,就很可能出现PermGen space错误
+Java Heap分为3个区
+1.Young
+2.Old
+3.Permanent
+Young保存刚实例化的对象。当该区被填满时，GC会将对象移到Old区。Permanent区则负责保存反射对象，本文不讨论该区。
+JVM的Heap分配可以使用-X参数设定，
+-Xms
+初始Heap大小
+-Xmx
+java heap最大值
+-Xmn
+young generation的heap大小
+JVM有2个GC线程
+第一个线程负责回收Heap的Young区
+第二个线程在Heap不足时，遍历Heap，将Young 区升级为Older区
+Older区的大小等于-Xmx减去-Xmn，不能将-Xms的值设的过大，因为第二个线程被迫运行会降低JVM的性能。
+为什么一些程序频繁发生GC？
+有如下原因：
+1.程序内调用了System.gc()或Runtime.gc()。
+2.一些中间件软件调用自己的GC方法，此时需要设置参数禁止这些GC。
+3.Java的Heap太小，一般默认的Heap值都很小。
+4.频繁实例化对象，Release对象 此时尽量保存并重用对象，例如使用StringBuffer()和String()。
+如果你发现每次GC后，Heap的剩余空间会是总空间的50%，这表示你的Heap处于健康状态,许多Server端的Java程序每次GC后最好能有65%的剩余空间
+经验之谈：
+1．Server端JVM最好将-Xms和-Xmx设为相同值。为了优化GC，最好让-Xmn值约等于-Xmx的1/3。官方推荐3/8
+2．一个GUI程序最好是每10到20秒间运行一次GC，每次在半秒之内完成。
+注意：
+1．增加Heap的大小虽然会降低GC的频率，但也增加了每次GC的时间。并且GC运行时，所有的用户线程将暂停，也就是GC期间，Java应用程序不做任何工作。
+2．Heap大小并不决定进程的内存使用量。进程的内存使用量要大于-Xmx定义的值，因为Java为其他任务分配内存，例如每个线程的Stack等。
+Stack的设定
+每个线程都有他自己的Stack。
+-Xss
+每个线程的Stack大小
+Stack的大小限制着线程的数量。如果Stack过大就好导致内存溢漏。-Xss参数决定Stack大小，例如-Xss1024K。如果Stack太小，也会导致Stack溢漏。
+硬件环境
+硬件环境也影响GC的效率，例如机器的种类，内存，swap空间，和CPU的数量。
+如果你的程序需要频繁创建很多transient对象，会导致JVM频繁GC。这种情况你可以增加机器的内存，来减少Swap空间的使用。
+4种GC
+1、第一种为单线程GC，也是默认的GC，该GC适用于单CPU机器。
+2、第二种为Throughput GC，是多线程的GC，适用于多CPU，使用大量线程的程序。第二种GC与第一种GC相似，不同在于GC在收集Young区是多线程的，但在Old区和第一种一样，仍然采用单线程。-XX:+UseParallelGC参数启动该GC。
+3、第三种为Concurrent Low Pause GC，类似于第一种，适用于多CPU，并要求缩短因GC造成程序停滞的时间。这种GC可以在Old区的回收同时，运行应用程序。-XX:+UseConcMarkSweepGC参数启动该GC。
+4、第四种为Incremental Low Pause GC，适用于要求缩短因GC造成程序停滞的时间。这种GC可以在Young区回收的同时，回收一部分Old区对象。-Xincgc参数启动该GC。
+单文件的JVM内存进行设置
+默认的java虚拟机的大小比较小，在对大数据进行处理时java就会报错：java.lang.OutOfMemoryError。
+设置jvm内存的方法，对于单独的.class，可以用下面的方法对Test运行时的jvm内存进行设置。
+java -Xms64m -Xmx256m Test
+-Xms是设置内存初始化的大小
+-Xmx是设置最大能够使用内存的大小（最好不要超过物理内存大小）
+tomcat启动jvm内存设置
+Linux：
+在/usr/local/apache-tomcat-5.5.23/bin目录下的catalina.sh添加：JAVA_OPTS='-Xms512m -Xmx1024m'要加“m”说明是MB，否则就是KB了，在启动tomcat时会报内存不足。
+-Xms：初始值
+-Xmx：最大值
+-Xmn：最小值Windows
+在catalina.bat最前面加入
+set JAVA_OPTS=-Xms128m -Xmx350m 如果用startup.bat启动tomcat,OK设置生效.够成功的分配200M内存.但是如果不是执行startup.bat启动tomcat而是利用windows的系统服务启动tomcat服务,上面的设置就不生效了,就是说set JAVA_OPTS=-Xms128m -Xmx350m 没起作用.上面分配200M内存就OOM了..windows服务执行的是bin\tomcat.exe.他读取注册表中的值,而不是catalina.bat的设置.解决办法:
+修改注册表HKEY_LOCAL_MACHINE\SOFTWARE\Apache Software Foundation\Tomcat Service Manager\Tomcat5\Parameters\JavaOptions

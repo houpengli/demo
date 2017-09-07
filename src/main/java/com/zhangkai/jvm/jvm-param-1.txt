@@ -1,0 +1,4 @@
+在catalina.sh中增加
+JAVA_OPTS="-server -Xms1g -Xmx4g -XX:MaxPermSize=1g -Xss512k -Djava.awt.headless=true"
+
+如果楼主的内存是16G的话，不妨可以装64位的JDK（当然操作系统也要64bit），并确认开启了指针压缩（64位的JDK相对于32位JDK要更耗内存），这样就基本没有内存限制了。堆内存可以设置为一半，8G，这个要看你的应用规模了。当然，如果楼主使用的是hotspot虚拟机的话，堆里面各个代（新生代，老生代，PermGen）的大小也需要好好设置一下。一般来说，新生代设置（-XX:NewSize=...）为堆大小的3/8，PermGen(-XX:PermSize=512m, -XX:MaxPermSize=512m)有512m足够了。总的来说，要看应用的需求。
