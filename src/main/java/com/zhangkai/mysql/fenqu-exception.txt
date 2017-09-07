@@ -1,0 +1,46 @@
+一个月之前，Scott和同事们发现公司有一个MySQL MHA集群的master（假设master机器名为hostA）每隔一周左右就会挂一次（指MySQL挂掉），在几周内，MHA来回切了好几次。
+
+按照国际惯例，Scott按照如下顺序去查问题到底出在哪里：
+（1）先翻MySQL error log，没有发现异常
+（2）再翻Linux系统日志文件，果然，翻到了下面的内容：
+
+Nov 26 13:05:38 hostA kernel: mysql invoked oom-killer: gfp_mask=0x280da, order=0, oom_adj=0, oom_score_adj=0
+...此处内容省略N行...
+Nov 26 13:05:38 hostA kernel: Out of memory: Kill process 32271 (mysqld) score 976 or sacrifice child
+Nov 26 13:05:38 hostA kernel: Killed process 32271, UID 496, (mysqld) total-vm:83064212kB, anon-rss:64204132kB, file-rss:4544kB
+
+该机器的物理内存大小为62G，从上面的日志看，MySQL确实已经把它用满了。该机器上MySQL的innodb_buffer_pool=31G，Scott认为这已经相当保守了，而且各种buffer_size我们都使用的是默认值，MySQL OOM时的用户连接数是100+，
+
+这些目测都没有什么问题，但是居然还是发生了OOM，实在是不可思议。当时觉得就是内存不够用了呗，没有查出具体原因，后来62G的内存加到了125G（innodb_buffer_pool_size增大到64G，这值确实很保守），还是发生了OOM。(OOM指的是在系统物理内存被用完时，Linux内核为了保证系统的正常运行，根据一定的算法杀掉占用内存较大的进程，基本上可以认为是杀掉占用内存最大的进程以释放内存资源。)
+
+其实一开始Scott就发现，这台机器上有一个更早的问题，就是因为系统最大文件打开数不够导致这台机器的xtrabackup备份总是不成功，具体是什么原因请等Scott去整理xtrabackup备份的更详细的过程。然后我去检查了该机器上面的*.ibd文件和*.frm文件数量，吓我一跳：
+
+[userA@hostA mysql]$ sudo find . -name '*.ibd' | wc -l
+169577
+[userA@hostA mysql]$ sudo find . -name '*.frm' | wc -l
+2534
+
+也就是说，该机器上面竟然有17万个ibd文件，但是只有2534张表，很明显是分区表中的分区数量非常多。
+
+[userA@hostA mysql]$ sudo find . -name '*par*' | wc -l
+1882
+
+Scott仔细比较了这台机器和其他没有问题的机器的不同，发现这台机器上面分区数量太多是唯一的一个不同，这让Scott没有办法不怀疑是分区导致的问题。
+
+Scott仍然按照国际惯例，第一时间去查MySQL 5.6的官方文档，无果。。。（官方文档虽然不是万能的，但是仍然是出现问题的第一参考资料）
+
+去MySQL的bugs页面搜索关于partition的bug，无果。。。
+
+去google了下，发现有的比较杂的网站上面写道MySQL分区数量太多引发内存耗尽的问题，但是文章讲的内容感觉不是很正确。
+
+最后在姜老师的指点下，看了这篇文章：
+
+http://mysqlserverteam.com/innodb-native-partitioning-early-access/
+
+上面是MySQL开发团队写的关于InnoDB Native Partitioning的文章。文章中大概讲的内容是，在5.6里面，分区的信息是在MySQL Server层维护的（在.par文件里面），InnoDB引擎层是不知道有分区这个概念的，InnoDB引擎层把每一个分区都当成一张普通的InnoDB表。在打开一个分区表时，会打开很多个分区，打开这些分区表就相当于打开了同等数量的InnoDB表，这需要更多内存存放InnoDB表的元数据和各种与ibd文件打开相关的各种cache与handler的信息。在5.7里面，InnoDB引入了Native Partitioning，它把分区的信息从Server层移到了InnoDB层，打开一个分区表和打开一个InnoDB表的内存开销基本是一样的。
+
+If we compare the amount of memory used when opening a single instance of this table, first using the old generic non-native partitioning, and then with InnoDB Native Partitioning we see the following:
+One open instance of the table takes 49% less memory (111MB vs 218MB) with the current state of Native Partitioning support. With ten open instances of the table, we take up 90% less memory (113MB vs 1166MB)!
+
+
+由于升级到5.7还需要一些时日，目前已经将分区数量减少到25000，125G剩余内存在20天里一直稳定在20G左右，这也表明确实是分区数量太多的原因。

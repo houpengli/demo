@@ -1,0 +1,37 @@
+每个设备每天数据1000-1500
+每个月数据30000-45000
+300个设备每个月的数据量1000万,  每天
+设备量400个
+
+
+create table range_test(
+    date datetime
+) ENGINE=MyISAM
+partition by range(DAY(date))(
+		partition p1 values less than (2),
+		partition p2 values less than (3),
+		partition p3 values less than (4),
+		partition p4 values less than (5),
+		partition p5 values less than (6),
+		partition p6 values less than (7),
+		partition p7 values less than (8),
+		partition p8 values less than (9),
+		partition p9 values less than (10),
+		partition p10 values less than (11),
+		partition p11 values less than (12),
+		partition p12 values less than MAXVALUE
+);
+
+INSERT INTO range_test values (now());
+
+explain select DAY(date) from range_test where DAY(date) = 7
+
+分区表主键问题
+ERROR 1503  A PRIMARY KEY must include all columns in the table's partitioning function
+
+查看数据是否已经分区保存
+SELECT PARTITION_NAME,TABLE_ROWS
+FROM INFORMATION_SCHEMA.PARTITIONS
+WHERE TABLE_NAME = 'range_test';
+
+

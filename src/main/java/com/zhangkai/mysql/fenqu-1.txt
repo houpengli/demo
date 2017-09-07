@@ -1,0 +1,42 @@
+========================
+
+1、建立分区表
+CREATE TABLE sale_data (
+sale_date  DATETIME NOT NULL,
+ale_item  VARCHAR(2) NOT NULL,
+sale_money DECIMAL(10,2) NOT NULL
+)
+PARTITION BY RANGE ((year(sale_date)*100+month(sale_date))*100+day(sale_date)) (
+PARTITION s20100401 VALUES LESS THAN (20100402),
+PARTITION s20100402 VALUES LESS THAN (20100403),
+PARTITION s20100403 VALUES LESS THAN (20100404),
+PARTITION s20100404 VALUES LESS THAN (20100405),
+PARTITION s20100405 VALUES LESS THAN (20100406),
+PARTITION s20100406 VALUES LESS THAN (20100407),
+PARTITION p1 VALUES LESS THAN (MAXVALUE)
+);
+
+2、增加分区
+PARTITION p1 VALUES LESS THAN (MAXVALUE) 这句要去掉，才可以增加分区
+ALTER TABLE sale_data
+ ADD PARTITION (PARTITION s20100402 VALUES LESS THAN (20100403));
+
+3、删除分区
+ALTER TABLE sale_data DROP PARTITION s20100406 ;
+
+4、正常使用
+insert into sale_data  values('2010-04-01','11',11.11);
+insert into sale_data  values('2010-04-02','22',22.22);
+
+5、查看数据是否已经分区保存
+SELECT PARTITION_NAME,TABLE_ROWS
+FROM INFORMATION_SCHEMA.PARTITIONS
+WHERE TABLE_NAME = 'sale_data';
+
++----------------+------------+
+| PARTITION_NAME | TABLE_ROWS |
++----------------+------------+
+| s20100401      |          1 |
+| s20100402      |          1 |
++----------------+------------+
+2 rows in set (0.09 sec)
