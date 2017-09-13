@@ -1,11 +1,11 @@
-spring boot °æ±¾ 1.5.2.RELEASE
+spring boot ç‰ˆæœ¬ 1.5.2.RELEASE
 
-ÅäÖÃ·½Ê½
-bootstrap.yml ÏµÍ³¼¶±ğÅäÖÃ
+é…ç½®æ–¹å¼
+bootstrap.yml ç³»ç»Ÿçº§åˆ«é…ç½®
 spring:
   application:
     name: proj
-  cloud: //Ô¶³ÌÅäÖÃ
+  cloud: //è¿œç¨‹é…ç½®
     config:
       enabled: true
       uri: http://disconfig.p.nxin.com/private/config/sprCld
@@ -16,7 +16,7 @@ spring:
         url: jdbc:mysql://192.168.16.137:3306/test
         username: root
         password:
-        # Ê¹ÓÃdruidÊı¾İÔ´
+        # ä½¿ç”¨druidæ•°æ®æº
         type: com.alibaba.druid.pool.DruidDataSource
         driver-class-name: com.mysql.jdbc.Driver
         filters: stat
@@ -33,7 +33,7 @@ spring:
         poolPreparedStatements: true
         maxOpenPreparedStatements: 20
 
-ÅäÖÃÖĞĞÄµÄÅäÖÃ
+é…ç½®ä¸­å¿ƒçš„é…ç½®
 mybatis.config-location=classpath:mybatis-config.xml
 spring.datasource.type=com.zaxxer.hikari.HikariDataSource
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
@@ -64,15 +64,15 @@ redis.port=6379
 redis.db=8
 
 
-application.yml ¶ÔÍâµÄÅäÖÃ
-¿ÉÒÔÓÃÀ´¶¨ÒåÓ¦ÓÃ¼¶±ğµÄ£¬Èç¹û´îÅäspring-cloud-configÊ¹ÓÃ application.ymlÀïÃæ¶¨ÒåµÄÎÄ¼ş¿ÉÒÔÊµÏÖ¶¯Ì¬Ìæ»»
-server.portÅäÖÃÁËtomcatµÄÆô¶¯¶Ë¿Ú£¬eurekaÊµÀıµÄÃû×Ö£¬ÒÔ¼°eurekaÆäËûÅäÖÃ¡£ÒòÎªÎÒÃÇÕâÀïÊÇeureka·şÎñ¶Ë£¬
-register-with-eurekaÅäÖÃÎªfalse£¬Õâ¸öÅäÖÃ±íÊ¾ÊÇ·ñ½«Æä±¾Éí×¢²áµ½eureka serverÒÔ±»ÆäËû·¢ÏÖ
-fetch-registryÅäÖÃÎªfalse£¬Õâ¸öÅäÖÃ±íÊ¾ÊÇ·ñĞèÒª´Óeureka serverÖĞ×¥È¡eurekaÉÏµÄ×¢²áĞÅÏ¢
-defaultZone Ä¬ÈÏµØÖ·Îª http://localhost:8761/eureak
+application.yml å¯¹å¤–çš„é…ç½®
+å¯ä»¥ç”¨æ¥å®šä¹‰åº”ç”¨çº§åˆ«çš„ï¼Œå¦‚æœæ­é…spring-cloud-configä½¿ç”¨ application.ymlé‡Œé¢å®šä¹‰çš„æ–‡ä»¶å¯ä»¥å®ç°åŠ¨æ€æ›¿æ¢
+server.porté…ç½®äº†tomcatçš„å¯åŠ¨ç«¯å£ï¼Œeurekaå®ä¾‹çš„åå­—ï¼Œä»¥åŠeurekaå…¶ä»–é…ç½®ã€‚å› ä¸ºæˆ‘ä»¬è¿™é‡Œæ˜¯eurekaæœåŠ¡ç«¯ï¼Œ
+register-with-eurekaé…ç½®ä¸ºfalseï¼Œè¿™ä¸ªé…ç½®è¡¨ç¤ºæ˜¯å¦å°†å…¶æœ¬èº«æ³¨å†Œåˆ°eureka serverä»¥è¢«å…¶ä»–å‘ç°
+fetch-registryé…ç½®ä¸ºfalseï¼Œè¿™ä¸ªé…ç½®è¡¨ç¤ºæ˜¯å¦éœ€è¦ä»eureka serverä¸­æŠ“å–eurekaä¸Šçš„æ³¨å†Œä¿¡æ¯
+defaultZone é»˜è®¤åœ°å€ä¸º http://localhost:8761/eureak
 
 
-spring bootÆô¶¯·½Ê½
+spring bootå¯åŠ¨æ–¹å¼
 @EnableTransactionManagement
 @SpringBootApplication
 SpringApplication app = new SpringApplication(AppMain.class);
@@ -80,33 +80,33 @@ SpringApplication app = new SpringApplication(AppMain.class);
         app.run(args);
 
 
-spring boot ²âÊÔ
+spring boot æµ‹è¯•
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest(classes = ActivitiTestAppMain.class)
 @Test
 
-spring boot ÔËĞĞÎ¬»¤
-java -jar²¿Êğ
-curl -X POST host:port/shutdown ÓÅÑÅÍ£»ú (Ô¶³Ìµ÷ÓÃ,¿ªÆô°²È«ÑéÖ¤)
+spring boot è¿è¡Œç»´æŠ¤
+java -jaréƒ¨ç½²
+curl -X POST host:port/shutdown ä¼˜é›…åœæœº (è¿œç¨‹è°ƒç”¨,å¼€å¯å®‰å…¨éªŒè¯)
 
 
-Spring Cloud×é³É±à¼­
-Spring CloudµÄ×ÓÏîÄ¿£¬´óÖÂ¿É·Ö³ÉÁ½Àà£¬Ò»ÀàÊÇ¶ÔÏÖÓĞ³ÉÊì¿ò¼Ü¡±Spring Boot»¯¡±µÄ·â×°ºÍ³éÏó£¬Ò²ÊÇÊıÁ¿×î¶àµÄÏîÄ¿£»µÚ¶şÀàÊÇ¿ª·¢ÁËÒ»²¿·Ö·Ö²¼Ê½ÏµÍ³µÄ»ù´¡ÉèÊ©µÄÊµÏÖ£¬ÈçSpring Cloud Stream°çÑİµÄ¾ÍÊÇkafka, ActiveMQÕâÑùµÄ½ÇÉ«¡£¶ÔÓÚÎÒÃÇÏë¿ìËÙÊµ¼ùÎ¢·şÎñµÄ¿ª·¢ÕßÀ´Ëµ£¬µÚÒ»Àà×ÓÏîÄ¿¾ÍÒÑ¾­×ã¹»Ê¹ÓÃ£¬Èç£º
+Spring Cloudç»„æˆç¼–è¾‘
+Spring Cloudçš„å­é¡¹ç›®ï¼Œå¤§è‡´å¯åˆ†æˆä¸¤ç±»ï¼Œä¸€ç±»æ˜¯å¯¹ç°æœ‰æˆç†Ÿæ¡†æ¶â€Spring BootåŒ–â€çš„å°è£…å’ŒæŠ½è±¡ï¼Œä¹Ÿæ˜¯æ•°é‡æœ€å¤šçš„é¡¹ç›®ï¼›ç¬¬äºŒç±»æ˜¯å¼€å‘äº†ä¸€éƒ¨åˆ†åˆ†å¸ƒå¼ç³»ç»Ÿçš„åŸºç¡€è®¾æ–½çš„å®ç°ï¼Œå¦‚Spring Cloud Streamæ‰®æ¼”çš„å°±æ˜¯kafka, ActiveMQè¿™æ ·çš„è§’è‰²ã€‚å¯¹äºæˆ‘ä»¬æƒ³å¿«é€Ÿå®è·µå¾®æœåŠ¡çš„å¼€å‘è€…æ¥è¯´ï¼Œç¬¬ä¸€ç±»å­é¡¹ç›®å°±å·²ç»è¶³å¤Ÿä½¿ç”¨ï¼Œå¦‚ï¼š
 Spring Cloud Netflix
-¡¡¡¡ÊÇ¶ÔNetflix¿ª·¢µÄÒ»Ì×·Ö²¼Ê½·şÎñ¿ò¼ÜµÄ·â×°£¬°üÀ¨·şÎñµÄ·¢ÏÖºÍ×¢²á£¬¸ºÔØ¾ùºâ¡¢¶ÏÂ·Æ÷¡¢REST¿Í»§¶Ë¡¢ÇëÇóÂ·ÓÉµÈ¡£
+ã€€ã€€æ˜¯å¯¹Netflixå¼€å‘çš„ä¸€å¥—åˆ†å¸ƒå¼æœåŠ¡æ¡†æ¶çš„å°è£…ï¼ŒåŒ…æ‹¬æœåŠ¡çš„å‘ç°å’Œæ³¨å†Œï¼Œè´Ÿè½½å‡è¡¡ã€æ–­è·¯å™¨ã€RESTå®¢æˆ·ç«¯ã€è¯·æ±‚è·¯ç”±ç­‰ã€‚
 Spring Cloud Config
-¡¡¡¡½«ÅäÖÃĞÅÏ¢ÖĞÑë»¯±£´æ, ÅäÖÃSpring Cloud Bus¿ÉÒÔÊµÏÖ¶¯Ì¬ĞŞ¸ÄÅäÖÃÎÄ¼ş
+ã€€ã€€å°†é…ç½®ä¿¡æ¯ä¸­å¤®åŒ–ä¿å­˜, é…ç½®Spring Cloud Buså¯ä»¥å®ç°åŠ¨æ€ä¿®æ”¹é…ç½®æ–‡ä»¶
 Spring Cloud Bus
-¡¡¡¡·Ö²¼Ê½ÏûÏ¢¶ÓÁĞ£¬ÊÇ¶ÔKafka, MQµÄ·â×°
+ã€€ã€€åˆ†å¸ƒå¼æ¶ˆæ¯é˜Ÿåˆ—ï¼Œæ˜¯å¯¹Kafka, MQçš„å°è£…
 Spring Cloud Security
-¡¡¡¡¶ÔSpring SecurityµÄ·â×°£¬²¢ÄÜÅäºÏNetflixÊ¹ÓÃ
+ã€€ã€€å¯¹Spring Securityçš„å°è£…ï¼Œå¹¶èƒ½é…åˆNetflixä½¿ç”¨
 Spring Cloud Zookeeper
-¡¡¡¡¶ÔZookeeperµÄ·â×°£¬Ê¹Ö®ÄÜÅäÖÃÆäËüSpring CloudµÄ×ÓÏîÄ¿Ê¹ÓÃ
+ã€€ã€€å¯¹Zookeeperçš„å°è£…ï¼Œä½¿ä¹‹èƒ½é…ç½®å…¶å®ƒSpring Cloudçš„å­é¡¹ç›®ä½¿ç”¨
 Spring Cloud Eureka
-Spring Cloud Eureka ÊÇ Spring Cloud Netflix Î¢·şÎñÌ×¼şÖĞµÄÒ»²¿·Ö£¬Ëü»ùÓÚNetflix Eureka ×öÁË¶ş´Î·Ö×°£¬Ö÷Òª¸ºÔğÍê³ÉÎ¢·şÎñ¼Ü¹¹ÖĞµÄ·şÎñÖÎÀí¹¦ÄÜ¡£
+Spring Cloud Eureka æ˜¯ Spring Cloud Netflix å¾®æœåŠ¡å¥—ä»¶ä¸­çš„ä¸€éƒ¨åˆ†ï¼Œå®ƒåŸºäºNetflix Eureka åšäº†äºŒæ¬¡åˆ†è£…ï¼Œä¸»è¦è´Ÿè´£å®Œæˆå¾®æœåŠ¡æ¶æ„ä¸­çš„æœåŠ¡æ²»ç†åŠŸèƒ½ã€‚
 
-kafkaÈÕÖ¾ÖĞĞÄ¿Í»§¶Ë
-HttpClient setHeader ÏµÍ³ID µ±Ç°ÇëÇóID  httpUrl
+kafkaæ—¥å¿—ä¸­å¿ƒå®¢æˆ·ç«¯
+HttpClient setHeader ç³»ç»ŸID å½“å‰è¯·æ±‚ID  httpUrl
 web filter
  org.slf4j.MDC.put("ccid", req.getHeader("ccid"));
 
@@ -114,13 +114,13 @@ dubbo
 @Activate(group = {Constants.PROVIDER, Constants.CONSUMER})
 public class CallchainFilter implements Filter
 
-MDC.put ÈÕÖ¾ÖĞ¼ÓÈë±êÊ¾
-RpcInvocation ri = (RpcInvocation) invocation; //RPCµ÷ÓÃ±êÊ¾
+MDC.put æ—¥å¿—ä¸­åŠ å…¥æ ‡ç¤º
+RpcInvocation ri = (RpcInvocation) invocation; //RPCè°ƒç”¨æ ‡ç¤º
                     ri.setAttachment("ccid", ccid);
                     ri.setAttachment("ccseq", String.valueOf(ccseq));
                     ri.setAttachment("sourceID", sourceID);
 
-Log´òÓ¡
+Logæ‰“å°
 package com.nxin.log.layout;
 
 import com.alibaba.fastjson.JSONObject;
@@ -217,7 +217,7 @@ public class NJsonLayout extends AbstractLayout<LogEvent> {
         if(MDC.get("sourceID") != null)
             json.put("source_id", MDC.get("sourceID"));
         else
-            json.put("source_id", systemId);    //À´Ô´ÓÚ×Ô¼º
+            json.put("source_id", systemId);    //æ¥æºäºè‡ªå·±
 
         if(MDC.get("logType") != null)
             json.put("log_type", MDC.get("logType"));
@@ -225,11 +225,11 @@ public class NJsonLayout extends AbstractLayout<LogEvent> {
         if(event.getSource() != null)
             json.put("method_name", event.getSource().getMethodName());
 
-        //±ê¼ÇÎªÊ±¼ä
+        //æ ‡è®°ä¸ºæ—¶é—´
         if(event.getMarker() != null && event.getMarker().getName().equals("TIME")){
             JSONObject timeInfo = (JSONObject) JSONObject.parse(event.getMessage().getFormattedMessage());
             json.put("msg", "");
-            json.put("method_name", timeInfo.get("sign"));  //Í³¼ÆµÄÊÇÄ³¸ö·½·¨
+            json.put("method_name", timeInfo.get("sign"));  //ç»Ÿè®¡çš„æ˜¯æŸä¸ªæ–¹æ³•
             json.put("logger_name", timeInfo.get("className"));
             json.put("elapsed_time", timeInfo.get("elapsedTime"));
             json.put("param", timeInfo.get("param"));
