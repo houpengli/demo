@@ -1,0 +1,158 @@
+生产者消费者问题
+   （英语：Producer-consumer problem），也称有限缓冲问题（英语：Bounded-buffer problem），是一个多线程同步问题的经典案例。该问题描述了两个共享固定大小缓冲区的线程——即所谓的“生产者”和“消费者”——在实际运行时会发生的问题。生产者的主要作用是生成一定量的数据放到缓冲区中，然后重复此过程。与此同时，消费者也在缓冲区消耗这些数据。该问题的关键就是要保证生产者不会在缓冲区满时加入数据，消费者也不会在缓冲区中空时消耗数据。
+    要解决该问题，就必须让生产者在缓冲区满时休眠（要么干脆就放弃数据），等到下次消费者消耗缓冲区中的数据的时候，生产者才能被唤醒，开始往缓冲区添加数据。同样，也可以让消费者在缓冲区空时进入休眠，等到生产者往缓冲区添加数据之后，再唤醒消费者。通常采用进程间通信的方法解决该问题，常用的方法有信号灯法[1]等。如果解决方法不够完善，则容易出现死锁的情况。出现死锁时，两个线程都会陷入休眠，等待对方唤醒自己。该问题也能被推广到多个生产者和消费者的情形。
+现实中的应用
+     比如一个饭店，它有一个厨师和一个服务员。这个服务员必须等待厨师准备好食物。当厨师准备好时，他会通知服务员，之后服务员上菜，然后返回继续等待。这是一个任务协作的实例：厨师代表生产者，服务员代表消费者。两个任务必须在食物被生产和消费时进行握手，而系统必须以有序的方式关闭。
+      可以用下图来表示这种关系。
+
+
+生产者消费者的实现
+这儿是用阻塞队列LinkedBlockingQueue来实现的，阻塞队列
+[java] view plain copy
+package com.a.consumer;
+
+import java.util.concurrent.*;
+
+public class consumer3 {
+    // 建立一个阻塞队列
+    private LinkedBlockingQueue<Object> queue = new LinkedBlockingQueue<Object>(10);
+
+    public consumer3() {
+    }
+
+    public void start() {
+        new Producer().start();
+        new Consumer().start();
+    }
+
+    public static void main(String[] args) throws Exception {
+        consumer3 s3 = new consumer3();
+        s3.start();
+    }
+
+    class Producer extends Thread {
+        public void run() {
+            while (true) {
+                try {
+                    Object o = new Object();
+                    // 取出一个对象
+                    queue.put(o); //队列满时会自动阻塞
+                    System.out.println("Producer: " + o);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    class Consumer extends Thread {
+        public void run() {
+            while (true) {
+                try {
+                    // 取出一个对象
+                    Object o = queue.take();
+                    System.out.println("Consumer: " + o);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+}
+
+BlockingQueue是一个接口
+如果BlockQueue是空的,从BlockingQueue取东西的操作将会被阻断进入等待状态,直到BlockingQueue进了东西才会被唤醒.同样,如果BlockingQueue是满的,任何试图往里存东西的操作也会被阻断进入等待状态,直到BlockingQueue里有空间才会被唤醒继续操作.
+    使用BlockingQueue的关键技术点如下:
+    1.BlockingQueue定义的常用方法如下:
+        1)add(anObject):把anObject加到BlockingQueue里,即如果BlockingQueue可以容纳,则返回true,否则报异常
+        2)offer(anObject):表示如果可能的话,将anObject加到BlockingQueue里,即如果BlockingQueue可以容纳,则返回true,否则返回false.
+        3)put(anObject):把anObject加到BlockingQueue里,如果BlockQueue没有空间,则调用此方法的线程被阻断直到BlockingQueue里面有空间再继续.
+        4)poll(time):取走BlockingQueue里排在首位的对象,若不能立即取出,则可以等time参数规定的时间,取不到时返回null
+        5)take():取走BlockingQueue里排在首位的对象,若BlockingQueue为空,阻断进入等待状态直到Blocking有新的对象被加入为止
+    2.BlockingQueue有四个具体的实现类,根据不同需求,选择不同的实现类
+        1)ArrayBlockingQueue:规定大小的BlockingQueue,其构造函数必须带一个int参数来指明其大小.其所含的对象是以FIFO(先入先出)顺序排序的.
+        2)LinkedBlockingQueue:大小不定的BlockingQueue,若其构造函数带一个规定大小的参数,生成的BlockingQueue有大小限制,若不带大小参数,所生成的BlockingQueue的大小由Integer.MAX_VALUE来决定.其所含的对象是以FIFO(先入先出)顺序排序的
+        3)PriorityBlockingQueue:类似于LinkedBlockQueue,但其所含对象的排序不是FIFO,而是依据对象的自然排序顺序或者是构造函数的Comparator决定的顺序.
+        4)SynchronousQueue:特殊的BlockingQueue,对其的操作必须是放和取交替完成的.
+    3.LinkedBlockingQueue和ArrayBlockingQueue比较起来,它们背后所用的数据结构不一样,导致LinkedBlockingQueue的数据吞吐量要大于ArrayBlockingQueue,但在线程数量很大时其性能的可预见性低于ArrayBlockingQueue.
+
+下面研究下LinkedBlockingQueue的源码
+由于LinkedBlockingQueue实现是线程安全的，实现了先进先出等特性，是作为生产者消费者的首选，LinkedBlockingQueue 可以指定容量，也可以不指定，不指定的话，默认最大是Integer.MAX_VALUE，其中主要用到put和take方法，put方法在队列满的时候会阻塞直到有队列成员被消费，take方法在队列空的时候会阻塞，直到有队列成员被放进来。
+offer和pool方法都有两个
+offer失败时，会返回false
+poll失败会返回null
+首先看一下它的put方法
+注意下面这句话，它会调用putLock.lockInterruptibly()这个方法，来试图获取这个putLock这个锁
+[java] view plain copy
+public void put(E e) throws InterruptedException {
+    if (e == null) throw new NullPointerException();
+    // Note: convention in all put/take/etc is to preset local var
+    // holding count negative to indicate failure unless set.
+    int c = -1;
+    final ReentrantLock putLock = this.putLock;
+    final AtomicInteger count = this.count;
+    putLock.lockInterruptibly();
+    try {
+        /*
+         * Note that count is used in wait guard even though it is
+         * not protected by lock. This works because count can
+         * only decrease at this point (all other puts are shut
+         * out by lock), and we (or some other waiting put) are
+         * signalled if it ever changes from
+         * capacity. Similarly for all other uses of count in
+         * other wait guards.
+         */
+        while (count.get() == capacity) {
+                notFull.await();
+        }
+        enqueue(e);
+        c = count.getAndIncrement();
+        if (c + 1 < capacity)
+            notFull.signal();
+    } finally {
+        putLock.unlock();
+    }
+    if (c == 0)
+        signalNotEmpty();
+}
+
+在看lockInterruptibly()方法的源码，实际是调用的sync这个同步器的acquireInterruptibly这个方法
+[java] view plain copy
+public void lockInterruptibly() throws InterruptedException {
+    sync.acquireInterruptibly(1);
+}
+
+在看acquireInterruptibly这个方法，就是先检查当前线程中断标识位是不是true，是true时，将抛出中断异常，否则会试着去获取锁，当没有获得锁时，会执行doAcquireInterruptibly这个方法
+[java] view plain copy
+public final void acquireInterruptibly(int arg) throws InterruptedException {
+    if (Thread.interrupted())
+        throw new InterruptedException();
+    if (!tryAcquire(arg))
+        doAcquireInterruptibly(arg);
+}
+下面在看一下doAcquireInterruptibly这个方法，要注意shouldParkAfterFailedAcquire这个方法，就是当它为true时，会接着执行parkAndCheckInterrupt()这个方法，当它也为真时，会跳出当前循环，然后取消获取锁，并且同时抛出异常。
+[java] view plain copy
+private void doAcquireInterruptibly(int arg)
+    throws InterruptedException {
+    final Node node = addWaiter(Node.EXCLUSIVE);
+    try {
+        for (;;) {
+            final Node p = node.predecessor();
+            if (p == head && tryAcquire(arg)) {
+                setHead(node);
+                p.next = null; // help GC
+                return;
+            }
+            if (shouldParkAfterFailedAcquire(p, node) &&
+                parkAndCheckInterrupt())
+                break;
+        }
+    } catch (RuntimeException ex) {
+        cancelAcquire(node);
+        throw ex;
+    }
+    // Arrive here only if interrupted
+    cancelAcquire(node);
+    throw new InterruptedException();
+}

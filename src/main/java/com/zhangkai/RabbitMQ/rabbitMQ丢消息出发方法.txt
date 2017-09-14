@@ -1,0 +1,58 @@
+ rabbitmq丢消息的处理方法
+2013-12-05 11:31 13793人阅读 评论(0) 收藏 举报
+版权声明：本文为博主原创文章，未经博主允许不得转载。
+
+最近发现系统rabbitmq丢消息比较严重，于是想了些方案来查找原因，给将消息发送方式添加确认机制。
+
+
+我们在本地模拟了wms发送打标消息的场景.
+
+1. 有事务
+
+2. 先发点对点队列, 再发订阅队列
+
+3. 批量发送
+
+4. 在生产环境与测试环境的RabbitMQ都进行了测试
+
+
+
+我们在测试的时候都没有出现丢失队列的情况.
+
+
+ 1、在RabbitMQ配置文件中,开启确认机制,如下：
+
+<rabbit:connection-factory id="connectionFactory" publisher-confirms="true" addresses="${rabbitmq.host}" />
+2、关闭amqpTemplate的事务(因为RabbitMQ官网给出的注释是confirm机制在事务情况下是不行的),如下图:
+<rabbit:template id="amqpTemplate" connection-factory="connectionFactory"
+channel-transacted="false" message-converter="jsonMessageConverter"/> 3、做完这些操作以后,在代码中可以如下启用confirm方式, 这其中confirm中的ack如果为true,可以认为是RabbitMQ服务器已经成功接收了消息：
+  rabbitTemplate.setConfirmCallback(new RabbitTemplate.ConfirmCallback() {
+          @Override
+          public void confirm(CorrelationData correlationData, boolean ack) {
+              System.err.println(correlationData.getId() + ack);
+          }
+          });
+
+/**
+ *
+ * @Title: callJMSclient
+ * @Description: TODO(发送打标的JMS通知信息)
+ * @param @param textMessage
+ * @param @return 设定文件
+ * @return List<String> lstCommNo 商品编码List
+ * @throws
+ */
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
+private void callJMSclient(String msg) {
+ try {
+//  rabbitTemplate.convertAndSend("wms.test.queue_direct", msg);
+//  logger.info("+++p2p:["+msg+"]+++");
+ rabbitTemplate.convertAndSend("amq.topic", "test.wms.usablestoragechanged.topic", msg,new CorrelationData("success:["+msg+"]"));
+ logger.info("&&&p2s:["+msg+"]&&&");
+ }catch (Exception e){
+ logger.info("=============error:["+e.getMessage()+"]=========");
+ }
+}
+这样就可以在日志里查看有没有消息发送失败。
+
+令我们奇怪的是，当把事务去掉以后的，消息就不再丢失了，具体原因还待分析，先把消息确认的方法记录下哈。
