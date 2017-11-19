@@ -1,3 +1,4 @@
+--------------------------
 理解Mysql的索引与优化
 转自：http://www.cnblogs.com/hustcat/archive/2009/10/28/1591648.html
 
